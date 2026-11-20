@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from app.errors import BusinessError, object_payload
-from app.pipeline import run, sample_text
+from app.pipeline import run, sample_text, labor_sample_text
 from app import store
 from app.exporter import evidence_csv
 from app.timeops import display_full
@@ -13,8 +13,8 @@ app=FastAPI(title='港口潮窗水深与进港排程')
 app.mount("/static",StaticFiles(directory=Path(__file__).parent/"static"),name="static")
 templates=Jinja2Templates(directory=Path(__file__).parent/"templates")
 templates.env.filters["utc_instant"]=display_full
-MODULES=['潮位接收', '船舶条件', '水深求窗', '航道冲突', '引航排程', '计划对账', '变更复核']
-for n,slug in enumerate(['tides', 'vessels', 'windows', 'channel', 'schedule', 'balance', 'changes'],1):
+MODULES=['潮位接收', '船舶条件', '水深求窗', '航道冲突', '引航排程', '计划对账', '变更复核', '班组工时']
+for n,slug in enumerate(['tides', 'vessels', 'windows', 'channel', 'schedule', 'balance', 'changes', 'labor'],1):
     app.include_router(importlib.import_module(f"app.modules.m{n}_{slug}.handler").router)
 @app.exception_handler(BusinessError)
 async def domain_error(request,exc):
@@ -25,10 +25,14 @@ def health(): return {"status":"ok"}
 def home(request:Request): return page(request,1)
 @app.get("/module/{module}",response_class=HTMLResponse)
 def page(request:Request,module:int):
-    if module not in range(1,8): raise BusinessError("MODULE","模块不存在",404)
+    if module not in range(1,9): raise BusinessError("MODULE","模块不存在",404)
     ident=request.query_params.get("run_id")
-    item=store.get(ident) if ident else store.save(sample_text(),run(sample_text()))
-    return templates.TemplateResponse(request=request,name="workbench.html",context={"title":'港口潮窗水深与进港排程',"modules":MODULES,"active":module,"run":item,"report":item["result"]["reports"][module-1]})
+    seed=labor_sample_text() if module==8 else sample_text()
+    item=store.get(ident) if ident else store.save(seed,run(seed))
+    context={"title":'港口潮窗水深与进港排程',"modules":MODULES,"active":module,"run":item,
+             "report":item["result"]["reports"][module-1],"labor":item["result"].get("labor",{}),
+             "ledger":store.ledger()}
+    return templates.TemplateResponse(request=request,name='labor.html' if module==8 else 'workbench.html',context=context)
 @app.post("/api/run")
 def calculate(payload:object=Body(default=None)):
     payload=object_payload(payload)
@@ -48,5 +52,7 @@ def review(payload:object=Body(...)):
 @app.get("/api/export/{ident}")
 def export(ident:str):
     return Response(evidence_csv(store.get(ident)),media_type="text/csv",headers={"Content-Disposition":"attachment; filename=evidence.csv"})
+@app.get("/api/labor")
+def labor_ledger(): return store.ledger()
 @app.get("/api/sample")
-def sample(): return {"text":sample_text()}
+def sample(module:int=1): return {"text":labor_sample_text() if module==8 else sample_text()}

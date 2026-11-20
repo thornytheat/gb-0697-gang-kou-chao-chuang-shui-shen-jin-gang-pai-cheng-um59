@@ -14,6 +14,7 @@
 | M5 引航排程 | 运行引航排程并核对证据 | `POST /api/5` | `app/modules/m5_schedule/rules.py` | `tests/test_schedule.py` |
 | M6 计划对账 | 运行计划对账并核对证据 | `POST /api/6` | `app/modules/m6_balance/rules.py` | `tests/test_balance.py` |
 | M7 变更复核 | 运行变更复核并核对证据 | `POST /api/7` | `app/modules/m7_changes/rules.py` | `tests/test_changes.py` |
+| M8 班组工时 | 按排程与回执核对班组工时 | `POST /api/8` | `app/modules/m8_labor/rules.py` | `tests/test_labor.py` |
 
 ## 陷阱登记
 
@@ -27,6 +28,11 @@
 | TRAP-14 | 同版冲突 | 静默采信错误值 | 隔离冲突 | `app/modules/m1_tides/rules.py` | `tests/test_tides.py::test_tides_duplicate` |
 | TRAP-23 | 相邻端点 | 静默采信错误值 | 半开区间 | `app/modules/m4_channel/rules.py` | `tests/test_channel.py::test_channel_end` |
 | TRAP-25 | 旧修订 | 静默采信错误值 | 拒绝陈旧版本 | `app/modules/m7_changes/rules.py` | `tests/test_changes.py::test_change_stale` |
+| TRAP-31 | 跨班航次 | 整段算给一个班 | 按班次切分工时 | `app/modules/m8_labor/rules.py` | `tests/test_labor.py::test_labor_receipt_settles_across_shift` |
+| TRAP-32 | 班次重叠 | 同一工时记两次 | 保留先者并隔离 | `app/modules/m2_vessels/rules.py` | `tests/test_labor.py::test_labor_shift_overlap_quarantined` |
+| TRAP-33 | 晚到回执 | 重算整段导致重复记工 | 只与上一版比补差 | `app/modules/m8_labor/rules.py` | `tests/test_labor.py::test_labor_correction_compares_previous_version` |
+| TRAP-34 | 重复核准 | 重跑重复记工 | 版本幂等键 | `app/store.py` | `tests/test_labor.py::test_store_repeat_approval_does_not_double_book` |
+| TRAP-35 | 退回清除工时 | 已核准工时不翼而飞 | 退回保留台账 | `app/store.py` | `tests/test_labor.py::test_store_rejected_run_keeps_approved_labor` |
 
 ## 对账规则
 
